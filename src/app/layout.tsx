@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import MobileNav from '@/components/MobileNav'
+import RouteGuard from '@/components/RouteGuard'
 
 export const metadata: Metadata = {
   title: 'MedQuest — Residência Médica',
@@ -13,8 +14,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR">
       <body>
         <AuthProvider>
-          {children}
-          <MobileNav />
+          <RouteGuard>
+            {children}
+            <MobileNav />
+          </RouteGuard>
         </AuthProvider>
       </body>
     </html>
