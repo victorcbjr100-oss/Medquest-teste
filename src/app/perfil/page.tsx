@@ -31,7 +31,8 @@ export default function PerfilPage() {
     if (!user) { setLoading(false); return }
 
     const uid = user.id
-    const meta = user.user_metadata || {}
+    if (!user) return;
+const meta = user.user_metadata || {}
 
     setPerfil({
       nome: meta.nome ?? meta.full_name ?? '',
