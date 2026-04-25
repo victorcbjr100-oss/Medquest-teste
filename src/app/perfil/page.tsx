@@ -36,7 +36,7 @@ export default function PerfilPage() {
     if (authLoading || !user) return
     async function load() {
       // Busca perfil salvo nos metadados do usuário
-      const meta = user.user_metadata || {}
+      const meta = user!.user_metadata || {}
       setPerfil({
         nome: meta.nome || meta.full_name || '',
         tipo: meta.tipo || '',
