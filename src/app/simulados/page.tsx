@@ -125,7 +125,7 @@ export default function SimuladosPage() {
 
             {/* Esquerda */}
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px', fontSize: 11 }}>
+              <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 14, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
                 Clique no tema para selecionar tudo · Expanda para escolher subtemas
               </div>
 
