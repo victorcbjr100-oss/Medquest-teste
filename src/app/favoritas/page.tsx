@@ -62,7 +62,7 @@ export default function FavoritasPage() {
             <div className="empty-icon">⭐</div>
             <div className="empty-title">Nenhuma favorita ainda</div>
             <div className="empty-sub">Após responder uma questão, clique em "☆ Favoritar" para salvá-la aqui.</div>
-            <button className="btn btn-primary" onClick={() => router.push('/')} style={{ marginTop: 8 }}>Ir para os temas →</button>
+            <button className="btn btn-primary" onClick={() => router.push('/temas-lista')} style={{ marginTop: 8 }}>Ir para os temas →</button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

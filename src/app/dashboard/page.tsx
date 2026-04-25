@@ -137,7 +137,7 @@ export default function DashboardPage() {
 
         {/* Ação rápida — 3 banners */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 28 }}>
-          <Link href="/" style={{ textDecoration: 'none', borderRadius: 16, overflow: 'hidden', background: 'linear-gradient(135deg, #4A90E2 0%, #6366F1 100%)', padding: '24px 22px', display: 'block', cursor: 'pointer', transition: 'transform .15s, box-shadow .15s' }}
+          <Link href="/temas-lista" style={{ textDecoration: 'none', borderRadius: 16, overflow: 'hidden', background: 'linear-gradient(135deg, #4A90E2 0%, #6366F1 100%)', padding: '24px 22px', display: 'block', cursor: 'pointer', transition: 'transform .15s, box-shadow .15s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(74,144,226,.35)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.75)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.5px' }}>Estudar por Temas</div>
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
                   Responda algumas questões<br />para ver seus temas aqui.
                 </div>
-                <Link href="/" className="btn btn-primary" style={{ marginTop: 12, fontSize: 13 }}>Começar agora →</Link>
+                <Link href="/temas-lista" className="btn btn-primary" style={{ marginTop: 12, fontSize: 13 }}>Começar agora →</Link>
               </div>
             ) : (
               stats.temasMaisEstudados.map(t => (
@@ -275,7 +275,7 @@ export default function DashboardPage() {
             <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24, lineHeight: 1.6 }}>
               Escolha um tema e responda sua primeira questão.<br />Seu progresso será salvo automaticamente.
             </div>
-            <Link href="/" className="btn btn-primary" style={{ fontSize: 15, padding: '12px 28px' }}>
+            <Link href="/temas-lista" className="btn btn-primary" style={{ fontSize: 15, padding: '12px 28px' }}>
               Ver especialidades →
             </Link>
           </div>

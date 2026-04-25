@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 
 const mobileItems = [
   { href: '/dashboard', icon: '⊞', label: 'Início' },
-  { href: '/', icon: '📚', label: 'Temas' },
+  { href: '/temas-lista', icon: '📚', label: 'Temas' },
   { href: '/estatisticas', icon: '📊', label: 'Stats' },
   { href: '/favoritas', icon: '☆', label: 'Favoritas' },
   { href: '/perfil', icon: '👤', label: 'Perfil' },
