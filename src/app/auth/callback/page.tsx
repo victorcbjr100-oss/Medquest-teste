@@ -10,13 +10,13 @@ export default function AuthCallbackPage() {
     // O Supabase processa o token da URL automaticamente
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        router.push('/')
+        router.push('/dashboard')
       }
     })
 
     // Fallback: redireciona após 3s se já estiver logado
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push('/')
+      if (session) router.push('/dashboard')
     })
 
     return () => subscription.unsubscribe()

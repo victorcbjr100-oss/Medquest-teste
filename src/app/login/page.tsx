@@ -34,7 +34,7 @@ export default function LoginPage() {
         else if (error.message.includes('Email not confirmed')) setError('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.')
         else setError('Erro ao entrar. Tente novamente.')
       } else {
-        router.push('/')
+        router.push('/dashboard')
       }
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
