@@ -82,6 +82,12 @@ export default function QuestoesPage() {
     }
   }, [idx, loading, questoes.length, pKey])
 
+  // Declarações que dependem de questoes e idx
+  const questaoAtual = questoes[idx]
+  const corretaId = questaoAtual?.alternativas.find(a => a.correta)?.id
+  const isFavoritada = questaoAtual ? favoritadas.has(questaoAtual.id) : false
+  const pctProgress = questoes.length > 0 ? Math.round((idx / questoes.length) * 100) : 0
+
   // Atualiza contexto global sempre que a questão atual muda
   useEffect(() => {
     if (!questaoAtual || loading) return
@@ -106,10 +112,8 @@ export default function QuestoesPage() {
     return () => clearPageData()
   }, [questaoAtual, answered, subtema, loading])
 
-  const questaoAtual = questoes[idx]
-  const corretaId = questaoAtual?.alternativas.find(a => a.correta)?.id
-  const isFavoritada = questaoAtual ? favoritadas.has(questaoAtual.id) : false
-  const pctProgress = questoes.length > 0 ? Math.round((idx / questoes.length) * 100) : 0
+  // linha removida — questaoAtual já declarada acima
+  
 
   async function responder() {
     if (selected === null || answered) return
