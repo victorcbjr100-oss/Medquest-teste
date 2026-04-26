@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 const navItems = [
   { href: '/dashboard', icon: '⊞', label: 'Página Inicial' },
   { href: '/temas-lista', icon: '📚', label: 'Temas' },
-  { href: '/simulados', icon: '🕐', label: 'Simulados' },
+  { href: '/simulados', icon: '🧪', label: 'Simulados' },
   { href: '/estatisticas', icon: '📊', label: 'Estatísticas' },
   { href: '/favoritas', icon: '☆', label: 'Favoritas' },
   { href: '/caderno', icon: '📓', label: 'Meu Caderno' },
@@ -24,14 +24,14 @@ export default function Sidebar() {
   }
 
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : '?'
-  const name = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const name = user?.user_metadata?.nome || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const emailShort = user?.email
     ? user.email.length > 24 ? user.email.slice(0, 24) + '…' : user.email
     : ''
+  const avatarUrl = user?.user_metadata?.avatar_url
 
   return (
     <div className="sidebar">
-      {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">MQ</div>
         <div>
@@ -40,14 +40,10 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <div className="sidebar-section-label">Menu Principal</div>
       {navItems.map(item => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={`nav-item ${pathname === item.href ? 'active' : ''}`}
-        >
+        <Link key={item.href} href={item.href}
+          className={`nav-item ${pathname === item.href ? 'active' : ''}`}>
           <span className="nav-item-icon">{item.icon}</span>
           {item.label}
         </Link>
@@ -62,9 +58,13 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      {/* Profile footer */}
       <div className="sidebar-profile">
-        <div className="sidebar-avatar">{initials}</div>
+        <Link href="/perfil" className="sidebar-avatar" title="Ver perfil">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="avatar" />
+            : initials
+          }
+        </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="sidebar-profile-name">{name}</div>
           {emailShort && <div className="sidebar-profile-email">{emailShort}</div>}
@@ -75,9 +75,7 @@ export default function Sidebar() {
           )}
         </div>
         {user && (
-          <button className="sidebar-logout" onClick={handleSignOut} title="Sair">
-            ↪
-          </button>
+          <button className="sidebar-logout" onClick={handleSignOut} title="Sair">↪</button>
         )}
       </div>
     </div>

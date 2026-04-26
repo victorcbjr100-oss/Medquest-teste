@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -8,31 +8,30 @@ import { useRouter } from 'next/navigation'
 interface Perfil {
   nome: string; tipo: string; especialidade_alvo: string
   ano_formatura: string; universidade: string; cidade: string
-  estado: string; objetivo: string
+  estado: string; objetivo: string; avatar_url: string
 }
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 const TIPOS = ['Estudante de Medicina','Médico Residente','Médico Formado','Professor']
 const ESPECIALIDADES = ['Clínica Médica','Cirurgia Geral','Pediatria','Ginecologia e Obstetrícia','Medicina de Família','Neurologia','Cardiologia','Pneumologia','Endocrinologia','Nefrologia','Gastroenterologia','Infectologia','Psiquiatria','Dermatologia','Ortopedia','Oftalmologia','Otorrinolaringologia','Radiologia','Anestesiologia','Medicina Preventiva','Ainda não decidi']
-
-const EMPTY_PERFIL: Perfil = { nome:'', tipo:'', especialidade_alvo:'', ano_formatura:'', universidade:'', cidade:'', estado:'', objetivo:'' }
+const EMPTY: Perfil = { nome:'', tipo:'', especialidade_alvo:'', ano_formatura:'', universidade:'', cidade:'', estado:'', objetivo:'', avatar_url:'' }
 
 export default function PerfilPage() {
   const { user, signOut, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [perfil, setPerfil] = useState<Perfil>(EMPTY_PERFIL)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [perfil, setPerfil] = useState<Perfil>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [stats, setStats] = useState({ respondidas: 0, acertos: 0, favoritas: 0 })
 
   useEffect(() => {
     if (authLoading) return
     if (!user) { setLoading(false); return }
-
     const uid = user.id
     const meta = user.user_metadata ?? {}
-
     setPerfil({
       nome: meta.nome ?? meta.full_name ?? '',
       tipo: meta.tipo ?? '',
@@ -42,8 +41,8 @@ export default function PerfilPage() {
       cidade: meta.cidade ?? '',
       estado: meta.estado ?? '',
       objetivo: meta.objetivo ?? '',
+      avatar_url: meta.avatar_url ?? '',
     })
-
     async function loadStats() {
       const [{ data: resps }, { count: favs }] = await Promise.all([
         supabase.from('respostas').select('acertou').eq('session_id', uid),
@@ -56,6 +55,33 @@ export default function PerfilPage() {
     loadStats()
   }, [user, authLoading])
 
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    if (file.size > 2 * 1024 * 1024) { alert('Foto muito grande. Use uma imagem menor que 2MB.'); return }
+
+    setUploadingAvatar(true)
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true, contentType: file.type })
+
+    if (uploadError) {
+      alert('Erro ao fazer upload: ' + uploadError.message)
+      setUploadingAvatar(false)
+      return
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    const url = data.publicUrl + '?t=' + Date.now() // cache bust
+
+    await supabase.auth.updateUser({ data: { ...perfil, avatar_url: url } })
+    setPerfil(p => ({ ...p, avatar_url: url }))
+    setUploadingAvatar(false)
+  }
+
   async function salvar() {
     if (!user) return
     setSaving(true)
@@ -65,10 +91,7 @@ export default function PerfilPage() {
     setTimeout(() => setSaved(false), 3000)
   }
 
-  async function handleSignOut() {
-    await signOut()
-    router.push('/login')
-  }
+  async function handleSignOut() { await signOut(); router.push('/login') }
 
   const pct = stats.respondidas > 0 ? Math.round((stats.acertos / stats.respondidas) * 100) : 0
   const pctColor = pct >= 70 ? '#50C878' : pct >= 50 ? '#F5A623' : pct > 0 ? '#E85D5D' : 'var(--blue)'
@@ -79,6 +102,7 @@ export default function PerfilPage() {
     border: '1.5px solid var(--border)', borderRadius: 10,
     fontSize: 14, fontFamily: 'Inter, sans-serif',
     color: 'var(--text)', background: 'var(--bg)', outline: 'none',
+    transition: 'border-color 0.15s ease',
   }
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 11, fontWeight: 600,
@@ -87,7 +111,7 @@ export default function PerfilPage() {
   }
 
   if (loading || authLoading) return (
-    <div className="app"><Sidebar /><div className="main"><div className="loading">⏳ Carregando perfil...</div></div></div>
+    <div className="app"><Sidebar /><div className="main"><div className="loading">Carregando perfil...</div></div></div>
   )
 
   return (
@@ -99,18 +123,96 @@ export default function PerfilPage() {
           <div className="page-sub">Suas informações pessoais e desempenho</div>
         </div>
 
-        {/* Header */}
-        <div className="card" style={{ display:'flex', alignItems:'center', gap:20, marginBottom:20 }}>
-          <div style={{ width:72, height:72, borderRadius:'50%', background:'linear-gradient(135deg,#4A90E2,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, fontWeight:700, color:'#fff', flexShrink:0 }}>
-            {initials}
+        {/* Header com avatar */}
+        <div className="card" style={{ display:'flex', alignItems:'center', gap:24, marginBottom:20 }}>
+          {/* Avatar clicável */}
+          <div style={{ position:'relative', flexShrink:0 }}>
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                width:80, height:80, borderRadius:'50%', cursor:'pointer',
+                background:'linear-gradient(135deg,#4A90E2,#6366F1)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:28, fontWeight:700, color:'#fff',
+                overflow:'hidden', position:'relative',
+                transition:'transform 0.2s ease, box-shadow 0.2s ease',
+                boxShadow:'0 2px 12px rgba(74,144,226,.3)',
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget
+                el.style.transform = 'scale(1.05)'
+                el.style.boxShadow = '0 4px 20px rgba(74,144,226,.4)'
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget
+                el.style.transform = 'scale(1)'
+                el.style.boxShadow = '0 2px 12px rgba(74,144,226,.3)'
+              }}
+            >
+              {perfil.avatar_url
+                ? <img src={perfil.avatar_url} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                : initials
+              }
+              {/* Overlay de edição */}
+              <div style={{
+                position:'absolute', inset:0,
+                background:'rgba(0,0,0,0.4)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                opacity:0, transition:'opacity 0.2s',
+                fontSize:20,
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+              >
+                📷
+              </div>
+            </div>
+            {uploadingAvatar && (
+              <div style={{
+                position:'absolute', inset:0, borderRadius:'50%',
+                background:'rgba(0,0,0,0.6)', display:'flex',
+                alignItems:'center', justifyContent:'center', fontSize:18,
+              }}>
+                ⏳
+              </div>
+            )}
+            {/* Badge de câmera */}
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                position:'absolute', bottom:0, right:0,
+                width:26, height:26, borderRadius:'50%',
+                background:'var(--blue)', border:'2px solid #fff',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                cursor:'pointer', fontSize:12,
+                transition:'transform 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.15)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              📷
+            </div>
+            <input
+              ref={fileRef} type="file" accept="image/*"
+              style={{ display:'none' }}
+              onChange={handleAvatarChange}
+            />
           </div>
+
           <div style={{ flex:1 }}>
             <div style={{ fontSize:20, fontWeight:700 }}>{perfil.nome || 'Seu nome'}</div>
             <div style={{ fontSize:13, color:'var(--muted)', marginTop:3 }}>{user?.email}</div>
             <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
               {perfil.tipo && <span className="tag tag-blue">{perfil.tipo}</span>}
               {perfil.especialidade_alvo && <span className="tag tag-green">🎯 {perfil.especialidade_alvo}</span>}
-              {perfil.cidade && perfil.estado && <span className="tag" style={{ background:'var(--bg)', color:'var(--muted)', border:'1px solid var(--border)' }}>📍 {perfil.cidade}/{perfil.estado}</span>}
+              {perfil.cidade && perfil.estado && (
+                <span className="tag" style={{ background:'var(--bg)', color:'var(--muted)', border:'1px solid var(--border)' }}>
+                  📍 {perfil.cidade}/{perfil.estado}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize:12, color:'var(--muted)', marginTop:8 }}>
+              Clique na foto para alterar · Máx. 2MB
             </div>
           </div>
         </div>
@@ -134,13 +236,13 @@ export default function PerfilPage() {
         <div className="card" style={{ marginBottom:16 }}>
           <div style={{ fontWeight:700, fontSize:15, marginBottom:20 }}>✏️ Informações pessoais</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-
             <div style={{ gridColumn:'1 / -1' }}>
               <label style={labelStyle}>Nome completo</label>
               <input style={inputStyle} value={perfil.nome} placeholder="Seu nome completo"
-                onChange={e => setPerfil(p => ({...p, nome:e.target.value}))} />
+                onChange={e => setPerfil(p => ({...p, nome:e.target.value}))}
+                onFocus={e => e.target.style.borderColor='var(--blue)'}
+                onBlur={e => e.target.style.borderColor='var(--border)'} />
             </div>
-
             <div>
               <label style={labelStyle}>Tipo de usuário</label>
               <select style={{...inputStyle, cursor:'pointer'}} value={perfil.tipo} onChange={e => setPerfil(p => ({...p, tipo:e.target.value}))}>
@@ -148,13 +250,13 @@ export default function PerfilPage() {
                 {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-
             <div>
               <label style={labelStyle}>Ano de formatura</label>
               <input style={inputStyle} value={perfil.ano_formatura} placeholder="Ex: 2024" type="number"
-                onChange={e => setPerfil(p => ({...p, ano_formatura:e.target.value}))} />
+                onChange={e => setPerfil(p => ({...p, ano_formatura:e.target.value}))}
+                onFocus={e => e.target.style.borderColor='var(--blue)'}
+                onBlur={e => e.target.style.borderColor='var(--border)'} />
             </div>
-
             <div>
               <label style={labelStyle}>Especialidade alvo</label>
               <select style={{...inputStyle, cursor:'pointer'}} value={perfil.especialidade_alvo} onChange={e => setPerfil(p => ({...p, especialidade_alvo:e.target.value}))}>
@@ -162,19 +264,20 @@ export default function PerfilPage() {
                 {ESPECIALIDADES.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
-
             <div>
               <label style={labelStyle}>Universidade</label>
               <input style={inputStyle} value={perfil.universidade} placeholder="Nome da sua faculdade"
-                onChange={e => setPerfil(p => ({...p, universidade:e.target.value}))} />
+                onChange={e => setPerfil(p => ({...p, universidade:e.target.value}))}
+                onFocus={e => e.target.style.borderColor='var(--blue)'}
+                onBlur={e => e.target.style.borderColor='var(--border)'} />
             </div>
-
             <div>
               <label style={labelStyle}>Cidade</label>
               <input style={inputStyle} value={perfil.cidade} placeholder="Sua cidade"
-                onChange={e => setPerfil(p => ({...p, cidade:e.target.value}))} />
+                onChange={e => setPerfil(p => ({...p, cidade:e.target.value}))}
+                onFocus={e => e.target.style.borderColor='var(--blue)'}
+                onBlur={e => e.target.style.borderColor='var(--border)'} />
             </div>
-
             <div>
               <label style={labelStyle}>Estado</label>
               <select style={{...inputStyle, cursor:'pointer'}} value={perfil.estado} onChange={e => setPerfil(p => ({...p, estado:e.target.value}))}>
@@ -182,20 +285,24 @@ export default function PerfilPage() {
                 {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
-
             <div style={{ gridColumn:'1 / -1' }}>
               <label style={labelStyle}>Objetivo / motivação</label>
               <textarea style={{...inputStyle, minHeight:90, resize:'vertical'}}
                 value={perfil.objetivo} placeholder="Ex: Passar na residência de Clínica Médica da USP em 2026..."
-                onChange={e => setPerfil(p => ({...p, objetivo:e.target.value}))} />
+                onChange={e => setPerfil(p => ({...p, objetivo:e.target.value}))}
+                onFocus={e => e.target.style.borderColor='var(--blue)'}
+                onBlur={e => e.target.style.borderColor='var(--border)'} />
             </div>
           </div>
-
           <div style={{ display:'flex', gap:10, marginTop:20, alignItems:'center' }}>
             <button className="btn btn-primary" onClick={salvar} disabled={saving} style={{ padding:'11px 28px' }}>
               {saving ? 'Salvando...' : 'Salvar alterações'}
             </button>
-            {saved && <span style={{ fontSize:13, color:'#50C878', fontWeight:600 }}>✅ Salvo!</span>}
+            {saved && (
+              <span style={{ fontSize:13, color:'#50C878', fontWeight:600, animation:'fadeIn 0.3s ease' }}>
+                ✅ Salvo com sucesso!
+              </span>
+            )}
           </div>
         </div>
 
