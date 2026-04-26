@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { usePageContext } from '@/context/PageContext'
 
 interface Alternativa { id: number; letra: string; texto: string; correta: boolean }
 interface Questao { id: number; enunciado: string; comentario: string; origem: string; alternativas: Alternativa[] }
@@ -40,6 +41,7 @@ export default function QuestoesPage() {
 
   const userId = user?.id || getSessionId()
   const pKey = progKey(subtemaId, userId)
+  const { setPageData, clearPageData } = usePageContext()
 
   const fetchData = useCallback(async () => {
     const [{ data: subData }, { data: qData }] = await Promise.all([
@@ -79,6 +81,30 @@ export default function QuestoesPage() {
       localStorage.setItem(pKey, JSON.stringify({ idx, total: questoes.length, timestamp: Date.now() }))
     }
   }, [idx, loading, questoes.length, pKey])
+
+  // Atualiza contexto global sempre que a questão atual muda
+  useEffect(() => {
+    if (!questaoAtual || loading) return
+    const correta = questaoAtual.alternativas.find(a => a.correta)
+    setPageData({
+      pagina: 'questoes',
+      questaoAtual: {
+        enunciado: questaoAtual.enunciado,
+        alternativas: questaoAtual.alternativas.map(a => ({
+          letra: a.letra,
+          texto: a.texto,
+          correta: a.correta,
+        })),
+        comentario: questaoAtual.comentario,
+        origem: questaoAtual.origem,
+        tema: subtema?.temas?.nome,
+        subtema: subtema?.nome,
+        respondida: answered,
+        respostaCorreta: correta ? `${correta.letra}) ${correta.texto}` : undefined,
+      },
+    })
+    return () => clearPageData()
+  }, [questaoAtual, answered, subtema, loading])
 
   const questaoAtual = questoes[idx]
   const corretaId = questaoAtual?.alternativas.find(a => a.correta)?.id

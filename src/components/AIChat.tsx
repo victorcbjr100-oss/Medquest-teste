@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { usePageContext } from '@/context/PageContext'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -18,7 +19,7 @@ function getPageContext(pathname: string): string {
   return 'Usando o MedQuest, plataforma de questões para residência médica'
 }
 
-const SUGGESTIONS = [
+const SUGGESTIONS_DEFAULT = [
   'Explique o gabarito da última questão',
   'Qual o diferencial entre FA e flutter atrial?',
   'Como memorizar os critérios de Framingham?',
@@ -27,6 +28,7 @@ const SUGGESTIONS = [
 
 export default function AIChat() {
   const pathname = usePathname()
+  const { pageData } = usePageContext()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -56,13 +58,36 @@ export default function AIChat() {
     setLoading(true)
     setError('')
 
+    // Monta contexto rico com dados da questão atual se disponível
+    let richContext = getPageContext(pathname)
+    if (pageData.questaoAtual) {
+      const q = pageData.questaoAtual
+      const altsTexto = q.alternativas
+        .sort((a, b) => a.letra.localeCompare(b.letra))
+        .map(a => `  ${a.letra}) ${a.texto}${a.correta ? ' ← CORRETA' : ''}`)
+        .join('\n')
+
+      richContext = `O usuário está respondendo uma questão de ${q.tema || 'medicina'} — subtema: ${q.subtema || ''}.
+${q.origem ? `Origem: ${q.origem}` : ''}
+${q.respondida ? `O usuário JÁ RESPONDEU esta questão. Resposta correta: ${q.respostaCorreta}` : 'O usuário AINDA NÃO respondeu esta questão.'}
+
+QUESTÃO ATUAL:
+${q.enunciado}
+
+ALTERNATIVAS:
+${altsTexto}
+${q.comentario ? `\nCOMENTÁRIO DO GABARITO:\n${q.comentario}` : ''}
+
+Use essas informações para responder as dúvidas do usuário sobre esta questão específica.`
+    }
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages,
-          pageContext: getPageContext(pathname),
+          pageContext: richContext,
         }),
       })
 
@@ -178,7 +203,7 @@ export default function AIChat() {
                 Pergunte sobre qualquer questão, gabarito, diagnóstico diferencial ou conceito médico.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {SUGGESTIONS.map(s => (
+                {(pageData.questaoAtual ? ["Explique o gabarito desta questão","Por que as outras alternativas estão erradas?","Qual o conceito-chave desta questão?","Me dê uma dica de memorização"] : SUGGESTIONS_DEFAULT).map(s => (
                   <button key={s} onClick={() => sendMessage(s)}
                     style={{
                       background: '#F4F6FA', border: '1px solid #E4E8F0',
