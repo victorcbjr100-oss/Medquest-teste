@@ -145,6 +145,7 @@ export default function RealizarSimuladoPage() {
       porTema[q.tema].total++
       if (respostas[q.id] === q.alternativas.find(a => a.correta)?.id) porTema[q.tema].acertos++
     })
+
     return (
       <div className="app"><Sidebar />
         <div className="main">
@@ -152,7 +153,9 @@ export default function RealizarSimuladoPage() {
             <div className="page-title">🏁 Simulado concluído!</div>
             <div className="page-sub">Tempo: {formatTime(elapsed)}</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+
+          {/* Cards de resumo */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
             {[
               { label: 'Respondidas', value: total, color: 'var(--blue)' },
               { label: 'Acertos', value: acertos, color: '#50C878' },
@@ -164,6 +167,8 @@ export default function RealizarSimuladoPage() {
               </div>
             ))}
           </div>
+
+          {/* Por especialidade */}
           <div className="card" style={{ marginBottom: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Por especialidade</div>
             {Object.entries(porTema).map(([tema, v]) => {
@@ -182,7 +187,186 @@ export default function RealizarSimuladoPage() {
               )
             })}
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+
+          {/* Mapa de navegação do gabarito */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>🗺️ Mapa do gabarito</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
+              Clique em qualquer questão para ver o gabarito e o comentário
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+              {questoes.map((q, i) => {
+                const resp = respostas[q.id]
+                const correta = q.alternativas.find(a => a.correta)?.id
+                const acertou = resp === correta
+                const respondeu = resp !== null
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => {
+                      const el = document.getElementById('gabarito-q-' + q.id)
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      el?.classList.add('gabarito-highlight')
+                      setTimeout(() => el?.classList.remove('gabarito-highlight'), 2000)
+                    }}
+                    title={`Q${i+1}: ${respondeu ? (acertou ? 'Correto' : 'Errado') : 'Não respondida'}`}
+                    style={{
+                      width: 30, height: 30, borderRadius: 7, border: 'none',
+                      cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                      fontFamily: 'Inter, sans-serif', transition: 'all .15s',
+                      background: !respondeu ? 'var(--border)' : acertou ? '#50C878' : '#E85D5D',
+                      color: respondeu ? '#fff' : 'var(--muted)',
+                      transform: 'scale(1)',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+                    onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  >
+                    {i + 1}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--muted)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: '#50C878', display: 'inline-block' }} /> Acerto
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: '#E85D5D', display: 'inline-block' }} /> Erro
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--border)', display: 'inline-block' }} /> Não respondida
+              </span>
+            </div>
+          </div>
+
+          {/* Gabarito completo questão por questão */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 20 }}>📋 Gabarito completo</div>
+            <style>{`
+              .gabarito-highlight { animation: highlightPulse 2s ease; }
+              @keyframes highlightPulse {
+                0% { box-shadow: 0 0 0 0 rgba(74,144,226,.6); }
+                50% { box-shadow: 0 0 0 8px rgba(74,144,226,.2); }
+                100% { box-shadow: 0 0 0 0 rgba(74,144,226,0); }
+              }
+            `}</style>
+
+            {questoes.map((q, i) => {
+              const resp = respostas[q.id]
+              const corretaAlt = q.alternativas.find(a => a.correta)
+              const acertou = resp === corretaAlt?.id
+              const respondeu = resp !== null
+              const borderColor = !respondeu ? 'var(--border)' : acertou ? '#50C878' : '#E85D5D'
+              const bgColor = !respondeu ? 'var(--bg)' : acertou ? 'var(--green-light)' : 'var(--red-light)'
+
+              return (
+                <div
+                  key={q.id}
+                  id={'gabarito-q-' + q.id}
+                  style={{
+                    border: `1.5px solid ${borderColor}`,
+                    borderRadius: 12,
+                    padding: '16px 18px',
+                    marginBottom: 14,
+                    background: bgColor,
+                    transition: 'box-shadow .3s',
+                  }}
+                >
+                  {/* Header da questão */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                      background: !respondeu ? 'var(--border)' : acertou ? '#50C878' : '#E85D5D',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700, color: '#fff',
+                    }}>
+                      {i + 1}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span className="tag tag-blue" style={{ fontSize: 10 }}>
+                        {q.tema} · {q.subtema}
+                      </span>
+                      {q.origem && (
+                        <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 8, fontWeight: 600, textTransform: 'uppercase' }}>
+                          {q.origem}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: !respondeu ? 'var(--muted)' : acertou ? '#50C878' : '#E85D5D',
+                    }}>
+                      {!respondeu ? '—' : acertou ? '✅ Acerto' : '❌ Erro'}
+                    </span>
+                  </div>
+
+                  {/* Enunciado */}
+                  <div style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--text)', marginBottom: 12 }}>
+                    {q.enunciado}
+                  </div>
+
+                  {/* Alternativas */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                    {q.alternativas.sort((a, b) => a.letra.localeCompare(b.letra)).map(alt => {
+                      const isCorreta = alt.id === corretaAlt?.id
+                      const isSelecionada = alt.id === resp
+                      const isErrada = isSelecionada && !isCorreta
+
+                      let bg = 'transparent'
+                      let border = '1px solid var(--border)'
+                      let color = 'var(--text)'
+                      let letraColor = 'var(--muted)'
+
+                      if (isCorreta) {
+                        bg = 'var(--green-light)'
+                        border = '1.5px solid #50C878'
+                        letraColor = '#1a8a42'
+                        color = '#1a8a42'
+                      } else if (isErrada) {
+                        bg = 'var(--red-light)'
+                        border = '1.5px solid #E85D5D'
+                        letraColor = '#E85D5D'
+                        color = '#E85D5D'
+                      }
+
+                      return (
+                        <div key={alt.id} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '8px 12px', borderRadius: 8,
+                          background: bg, border, fontSize: 13, lineHeight: 1.5,
+                        }}>
+                          <span style={{ fontWeight: 700, color: letraColor, flexShrink: 0, minWidth: 16 }}>
+                            {alt.letra}
+                          </span>
+                          <span style={{ color, flex: 1 }}>{alt.texto}</span>
+                          {isCorreta && <span style={{ color: '#1a8a42', fontWeight: 700, flexShrink: 0 }}>✓</span>}
+                          {isErrada && <span style={{ color: '#E85D5D', fontWeight: 700, flexShrink: 0 }}>✗</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Comentário */}
+                  {q.comentario && (
+                    <div style={{
+                      background: 'var(--surface)', borderRadius: 8,
+                      padding: '12px 14px', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>
+                        💡 Comentário
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7 }}>
+                        {q.comentario}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Botões de ação */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 32 }}>
             <button className="btn btn-primary" onClick={() => router.push('/simulados')}>Novo simulado →</button>
             <button className="btn btn-outline" onClick={() => router.push('/estatisticas')}>Ver estatísticas →</button>
           </div>
