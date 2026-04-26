@@ -3,7 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import MobileNav from '@/components/MobileNav'
 import RouteGuard from '@/components/RouteGuard'
-import PageTransition from '@/components/PageTransition'
+import AIChat from '@/components/AIChat'
 
 export const metadata: Metadata = {
   title: 'MedQuest — Residência Médica',
@@ -24,10 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <RouteGuard>
-            <PageTransition>
-              {children}
-            </PageTransition>
+            {children}
             <MobileNav />
+            <AIChat />
           </RouteGuard>
         </AuthProvider>
       </body>
