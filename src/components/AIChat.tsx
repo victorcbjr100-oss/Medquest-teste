@@ -7,34 +7,23 @@ interface Message {
   content: string
 }
 
-// Contexto baseado na página atual
 function getPageContext(pathname: string): string {
-  if (pathname === '/dashboard') return 'O usuário está na página inicial do MedQuest, que mostra seu desempenho geral, questões respondidas e temas mais estudados.'
-  if (pathname.startsWith('/temas')) return 'O usuário está navegando pelos temas de medicina para residência médica.'
-  if (pathname.startsWith('/questoes')) return 'O usuário está respondendo questões de medicina para residência médica. Pode estar com dúvidas sobre uma questão específica, diagnóstico diferencial, conduta ou conceito médico abordado.'
-  if (pathname.startsWith('/simulados')) return 'O usuário está na área de simulados, que simula provas de residência médica com tempo cronometrado.'
-  if (pathname === '/estatisticas') return 'O usuário está vendo suas estatísticas de desempenho por especialidade.'
-  if (pathname === '/desempenho') return 'O usuário está analisando seu desempenho inteligente, com sugestões de temas para melhorar.'
-  if (pathname === '/favoritas') return 'O usuário está revisando suas questões favoritas salvas.'
-  if (pathname === '/perfil') return 'O usuário está na página de perfil.'
-  return 'O usuário está usando o MedQuest, plataforma de questões para residência médica.'
+  if (pathname === '/dashboard') return 'Página inicial com resumo de desempenho do usuário'
+  if (pathname.startsWith('/temas')) return 'Navegando por temas e especialidades médicas'
+  if (pathname.startsWith('/questoes')) return 'Respondendo questões de medicina para residência. O usuário pode ter dúvidas sobre o gabarito, diagnóstico diferencial ou conceito da questão.'
+  if (pathname.startsWith('/simulados')) return 'Realizando simulado cronometrado de prova de residência médica'
+  if (pathname === '/estatisticas') return 'Visualizando estatísticas de desempenho por especialidade'
+  if (pathname === '/desempenho') return 'Analisando desempenho inteligente com sugestões de melhora'
+  if (pathname === '/favoritas') return 'Revisando questões favoritas salvas'
+  return 'Usando o MedQuest, plataforma de questões para residência médica'
 }
 
-const SYSTEM_PROMPT = `Você é o MedBot, assistente de estudos do MedQuest — plataforma de questões para residência médica brasileira.
-
-Seu papel:
-- Explicar gabaritos e comentários de questões de forma didática
-- Esclarecer dúvidas sobre diagnóstico diferencial, condutas e conceitos médicos
-- Ajudar o usuário a entender por que uma alternativa está certa ou errada
-- Dar dicas de estudo e memorização para residência médica
-- Ser conciso e objetivo (respostas de no máximo 4-6 linhas, exceto quando necessário)
-- Usar linguagem clínica precisa mas acessível
-- Focar sempre no contexto de provas de residência médica brasileira (REVALIDA, USP, UNICAMP, etc.)
-
-Você NÃO deve:
-- Dar diagnósticos ou condutas para casos reais de pacientes
-- Sair do contexto médico-educacional
-- Ser prolixo — seja direto e educativo`
+const SUGGESTIONS = [
+  'Explique o gabarito da última questão',
+  'Qual o diferencial entre FA e flutter atrial?',
+  'Como memorizar os critérios de Framingham?',
+  'Me dê dicas para estudar Cardiologia',
+]
 
 export default function AIChat() {
   const pathname = usePathname()
@@ -42,82 +31,52 @@ export default function AIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [groqKey, setGroqKey] = useState('')
-  const [keySet, setKeySet] = useState(false)
-  const [keyInput, setKeyInput] = useState('')
+  const [error, setError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Esconde nas páginas de auth
   if (pathname === '/login' || pathname === '/auth/callback') return null
 
   useEffect(() => {
-    // Tenta recuperar chave salva
-    const saved = localStorage.getItem('mq_groq_key')
-    if (saved) { setGroqKey(saved); setKeySet(true) }
-  }, [])
-
-  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loading])
 
   useEffect(() => {
-    if (open && keySet) {
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
-  }, [open, keySet])
+    if (open) setTimeout(() => inputRef.current?.focus(), 150)
+  }, [open])
 
-  function saveKey() {
-    if (!keyInput.trim()) return
-    localStorage.setItem('mq_groq_key', keyInput.trim())
-    setGroqKey(keyInput.trim())
-    setKeySet(true)
-    setKeyInput('')
-  }
+  async function sendMessage(text?: string) {
+    const msg = (text || input).trim()
+    if (!msg || loading) return
 
-  async function sendMessage() {
-    if (!input.trim() || loading) return
-
-    const userMsg: Message = { role: 'user', content: input.trim() }
+    const userMsg: Message = { role: 'user', content: msg }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
     setLoading(true)
-
-    const pageCtx = getPageContext(pathname)
+    setError('')
 
     try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 512,
-          temperature: 0.4,
-          messages: [
-            { role: 'system', content: `${SYSTEM_PROMPT}\n\nContexto atual: ${pageCtx}` },
-            ...newMessages.map(m => ({ role: m.role, content: m.content })),
-          ],
+          messages: newMessages,
+          pageContext: getPageContext(pathname),
         }),
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error?.message || 'Erro na API Groq')
+        throw new Error(data.error || 'Erro ao contatar o servidor')
       }
 
-      const data = await res.json()
-      const reply = data.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma resposta.'
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
     } catch (e: any) {
-      const msg = e.message?.includes('401') || e.message?.includes('invalid')
-        ? 'Chave inválida. Clique no ⚙️ para atualizar.'
-        : 'Erro ao conectar. Tente novamente.'
-      setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${msg}` }])
+      setError(e.message || 'Erro de conexão. Tente novamente.')
     }
+
     setLoading(false)
   }
 
@@ -126,29 +85,29 @@ export default function AIChat() {
       {/* Botão flutuante */}
       <button
         onClick={() => setOpen(o => !o)}
+        aria-label="Abrir assistente MedBot"
         style={{
           position: 'fixed',
-          bottom: open ? 420 : 24,
+          bottom: open ? 428 : 24,
           right: 24,
-          width: 52, height: 52,
+          width: 54, height: 54,
           borderRadius: '50%',
           background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 22,
-          boxShadow: '0 4px 20px rgba(74,144,226,.45)',
+          fontSize: 24,
+          boxShadow: '0 4px 20px rgba(74,144,226,.5)',
           transition: 'bottom 0.3s cubic-bezier(0.4,0,0.2,1), transform 0.2s ease, box-shadow 0.2s ease',
           zIndex: 200,
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'scale(1.1)'
-          e.currentTarget.style.boxShadow = '0 6px 28px rgba(74,144,226,.55)'
+          e.currentTarget.style.boxShadow = '0 6px 28px rgba(74,144,226,.6)'
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'scale(1)'
-          e.currentTarget.style.boxShadow = '0 4px 20px rgba(74,144,226,.45)'
+          e.currentTarget.style.boxShadow = '0 4px 20px rgba(74,144,226,.5)'
         }}
-        title="MedBot — Assistente de estudos"
       >
         {open ? '✕' : '🤖'}
       </button>
@@ -156,234 +115,230 @@ export default function AIChat() {
       {/* Chat box */}
       <div style={{
         position: 'fixed',
-        bottom: 88,
+        bottom: 90,
         right: 24,
-        width: 360,
-        height: 480,
+        width: 365,
+        height: 490,
         background: '#fff',
-        borderRadius: 18,
-        boxShadow: '0 8px 40px rgba(0,0,0,.15)',
+        borderRadius: 20,
+        boxShadow: '0 12px 48px rgba(0,0,0,.16)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
         zIndex: 199,
         border: '1px solid #E4E8F0',
         opacity: open ? 1 : 0,
-        transform: open ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
+        transform: open ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.96)',
         pointerEvents: open ? 'all' : 'none',
-        transition: 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+        transition: 'opacity 0.22s ease, transform 0.22s cubic-bezier(0.4,0,0.2,1)',
       }}>
 
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #0F1117, #1A1D27)',
+          background: 'linear-gradient(135deg, #0F1117 0%, #1A1D27 100%)',
           padding: '14px 18px',
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 12,
+          flexShrink: 0,
         }}>
           <div style={{
-            width: 36, height: 36, borderRadius: '50%',
+            width: 38, height: 38, borderRadius: '50%',
             background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, flexShrink: 0,
+            fontSize: 20, flexShrink: 0,
           }}>🤖</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>MedBot</div>
-            <div style={{ fontSize: 11, color: '#6B7A99' }}>Assistente de estudos • Groq AI</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px' }}>MedBot</div>
+            <div style={{ fontSize: 11, color: '#6B7A99', marginTop: 1 }}>
+              Assistente de estudos • IA
+            </div>
           </div>
-          {keySet && (
-            <button
-              onClick={() => setKeySet(false)}
-              style={{ background: 'none', border: 'none', color: '#6B7A99', cursor: 'pointer', fontSize: 16, padding: 4 }}
-              title="Alterar chave API"
-            >⚙️</button>
-          )}
+          {/* Indicador online */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{
+              width: 7, height: 7, borderRadius: '50%', background: '#50C878',
+              boxShadow: '0 0 0 2px rgba(80,200,120,.3)',
+            }} />
+            <span style={{ fontSize: 11, color: '#50C878', fontWeight: 500 }}>Online</span>
+          </div>
         </div>
 
-        {/* Setup da chave */}
-        {!keySet ? (
-          <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 13, lineHeight: 1.7, color: '#374151' }}>
-              <strong>Configure o MedBot</strong> com sua chave gratuita do Groq:
+        {/* Mensagens */}
+        <div style={{
+          flex: 1, overflowY: 'auto', padding: '16px',
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          {/* Estado inicial */}
+          {messages.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '12px 8px' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🩺</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 6 }}>
+                Olá! Sou o MedBot.
+              </div>
+              <div style={{ fontSize: 12.5, color: '#6B7280', lineHeight: 1.7, marginBottom: 16 }}>
+                Pergunte sobre qualquer questão, gabarito, diagnóstico diferencial ou conceito médico.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {SUGGESTIONS.map(s => (
+                  <button key={s} onClick={() => sendMessage(s)}
+                    style={{
+                      background: '#F4F6FA', border: '1px solid #E4E8F0',
+                      borderRadius: 9, padding: '9px 13px', fontSize: 12.5,
+                      color: '#4A90E2', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                      textAlign: 'left', transition: 'all 0.15s', fontWeight: 500,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#EBF3FD'
+                      e.currentTarget.style.borderColor = '#4A90E2'
+                      e.currentTarget.style.transform = 'translateX(3px)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#F4F6FA'
+                      e.currentTarget.style.borderColor = '#E4E8F0'
+                      e.currentTarget.style.transform = 'translateX(0)'
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-            <ol style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.8, paddingLeft: 18 }}>
-              <li>Acesse <a href="https://console.groq.com" target="_blank" rel="noreferrer" style={{ color: '#4A90E2' }}>console.groq.com</a></li>
-              <li>Crie uma conta gratuita</li>
-              <li>Vá em <strong>API Keys → Create API Key</strong></li>
-              <li>Cole a chave abaixo</li>
-            </ol>
-            <input
-              type="password"
-              value={keyInput}
-              onChange={e => setKeyInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveKey()}
-              placeholder="gsk_..."
-              style={{
-                padding: '10px 14px', borderRadius: 10,
-                border: '1.5px solid #E4E8F0', fontSize: 14,
-                fontFamily: 'Inter, sans-serif', outline: 'none',
-              }}
-              onFocus={e => e.target.style.borderColor = '#4A90E2'}
-              onBlur={e => e.target.style.borderColor = '#E4E8F0'}
-            />
-            <button
-              onClick={saveKey}
-              disabled={!keyInput.trim()}
-              style={{
-                background: keyInput.trim() ? '#4A90E2' : '#E4E8F0',
-                color: keyInput.trim() ? '#fff' : '#9CA3AF',
-                border: 'none', borderRadius: 10, padding: '11px',
-                fontSize: 14, fontWeight: 600, cursor: keyInput.trim() ? 'pointer' : 'default',
-                fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
-              }}
-            >
-              Ativar MedBot →
-            </button>
-            <div style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center' }}>
-              Plano gratuito: 14.400 tokens/min • Salvo localmente
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Mensagens */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {messages.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '20px 10px' }}>
-                  <div style={{ fontSize: 32, marginBottom: 10 }}>🩺</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Olá! Sou o MedBot.
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.7 }}>
-                    Pergunte sobre qualquer questão, diagnóstico diferencial, conduta ou conceito médico. Estou aqui para ajudar!
-                  </div>
-                  {/* Sugestões rápidas */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
-                    {[
-                      'Explique o gabarito da última questão',
-                      'Qual a diferença entre FA e Flutter atrial?',
-                      'Como memorizar os critérios de Framingham?',
-                    ].map(s => (
-                      <button key={s} onClick={() => setInput(s)}
-                        style={{
-                          background: '#F4F6FA', border: '1px solid #E4E8F0',
-                          borderRadius: 8, padding: '8px 12px', fontSize: 12,
-                          color: '#4A90E2', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                          textAlign: 'left', transition: 'all 0.15s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#EBF3FD'; e.currentTarget.style.borderColor = '#4A90E2' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#F4F6FA'; e.currentTarget.style.borderColor = '#E4E8F0' }}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          )}
 
-              {messages.map((msg, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  gap: 8,
-                  animation: 'slideUp 0.2s ease',
-                }}>
-                  {msg.role === 'assistant' && (
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                      background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
-                    }}>🤖</div>
-                  )}
-                  <div style={{
-                    maxWidth: '80%',
-                    padding: '9px 13px',
-                    borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                    background: msg.role === 'user'
-                      ? 'linear-gradient(135deg, #4A90E2, #6366F1)'
-                      : '#F4F6FA',
-                    color: msg.role === 'user' ? '#fff' : '#111827',
-                    fontSize: 13,
-                    lineHeight: 1.65,
-                    fontFamily: 'Inter, sans-serif',
-                    border: msg.role === 'assistant' ? '1px solid #E4E8F0' : 'none',
-                    whiteSpace: 'pre-wrap',
-                  }}>
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-
-              {/* Typing indicator */}
-              {loading && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0,
-                  }}>🤖</div>
-                  <div style={{ background: '#F4F6FA', border: '1px solid #E4E8F0', borderRadius: '14px 14px 14px 4px', padding: '10px 14px', display: 'flex', gap: 4 }}>
-                    {[0,1,2].map(i => (
-                      <div key={i} style={{
-                        width: 6, height: 6, borderRadius: '50%', background: '#9CA3AF',
-                        animation: `typingBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-                      }} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input */}
-            <div style={{
-              padding: '10px 14px',
-              borderTop: '1px solid #E4E8F0',
-              display: 'flex', gap: 8, alignItems: 'center',
+          {/* Mensagens do chat */}
+          {messages.map((msg, i) => (
+            <div key={i} style={{
+              display: 'flex',
+              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              gap: 8,
+              animation: 'msgIn 0.2s ease',
             }}>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                placeholder="Pergunte sobre medicina..."
-                disabled={loading}
-                style={{
-                  flex: 1, padding: '9px 13px',
-                  border: '1.5px solid #E4E8F0', borderRadius: 10,
-                  fontSize: 13, fontFamily: 'Inter, sans-serif',
-                  outline: 'none', background: '#F4F6FA',
-                  transition: 'border-color 0.15s',
-                }}
-                onFocus={e => e.target.style.borderColor = '#4A90E2'}
-                onBlur={e => e.target.style.borderColor = '#E4E8F0'}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || loading}
-                style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: input.trim() && !loading ? '#4A90E2' : '#E4E8F0',
-                  border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default',
+              {msg.role === 'assistant' && (
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, transition: 'all 0.15s', flexShrink: 0,
-                }}
-                onMouseEnter={e => { if (input.trim() && !loading) e.currentTarget.style.transform = 'scale(1.1)' }}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                {loading ? '⏳' : '➤'}
-              </button>
+                  fontSize: 14, marginTop: 2,
+                }}>🤖</div>
+              )}
+              <div style={{
+                maxWidth: '78%',
+                padding: '10px 14px',
+                borderRadius: msg.role === 'user'
+                  ? '16px 16px 4px 16px'
+                  : '16px 16px 16px 4px',
+                background: msg.role === 'user'
+                  ? 'linear-gradient(135deg, #4A90E2, #5B6EF5)'
+                  : '#F4F6FA',
+                color: msg.role === 'user' ? '#fff' : '#111827',
+                fontSize: 13.5,
+                lineHeight: 1.65,
+                fontFamily: 'Inter, sans-serif',
+                border: msg.role === 'assistant' ? '1px solid #E4E8F0' : 'none',
+                whiteSpace: 'pre-wrap',
+                boxShadow: msg.role === 'user'
+                  ? '0 2px 8px rgba(74,144,226,.3)'
+                  : '0 1px 4px rgba(0,0,0,.05)',
+              }}>
+                {msg.content}
+              </div>
             </div>
-          </>
-        )}
+          ))}
+
+          {/* Typing indicator */}
+          {loading && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', animation: 'msgIn 0.2s ease' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #4A90E2, #6366F1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+              }}>🤖</div>
+              <div style={{
+                background: '#F4F6FA', border: '1px solid #E4E8F0',
+                borderRadius: '16px 16px 16px 4px',
+                padding: '12px 16px', display: 'flex', gap: 5, alignItems: 'center',
+              }}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{
+                    width: 6, height: 6, borderRadius: '50%', background: '#9CA3AF',
+                    animation: `bounce 1.1s ease-in-out ${i * 0.18}s infinite`,
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Erro */}
+          {error && (
+            <div style={{
+              background: '#FDEAEA', border: '1px solid #E85D5D',
+              borderRadius: 10, padding: '10px 14px',
+              fontSize: 12.5, color: '#E85D5D', lineHeight: 1.6,
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div style={{
+          padding: '10px 14px',
+          borderTop: '1px solid #E4E8F0',
+          display: 'flex', gap: 8, alignItems: 'center',
+          background: '#fff', flexShrink: 0,
+        }}>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) sendMessage() }}
+            placeholder="Pergunte sobre medicina..."
+            disabled={loading}
+            style={{
+              flex: 1, padding: '10px 14px',
+              border: '1.5px solid #E4E8F0', borderRadius: 11,
+              fontSize: 13.5, fontFamily: 'Inter, sans-serif',
+              outline: 'none', background: '#F4F6FA',
+              transition: 'border-color 0.15s, background 0.15s',
+              color: '#111827',
+            }}
+            onFocus={e => { e.target.style.borderColor = '#4A90E2'; e.target.style.background = '#fff' }}
+            onBlur={e => { e.target.style.borderColor = '#E4E8F0'; e.target.style.background = '#F4F6FA' }}
+          />
+          <button
+            onClick={() => sendMessage()}
+            disabled={!input.trim() || loading}
+            style={{
+              width: 38, height: 38, borderRadius: 11,
+              background: input.trim() && !loading
+                ? 'linear-gradient(135deg, #4A90E2, #5B6EF5)'
+                : '#E4E8F0',
+              border: 'none',
+              cursor: input.trim() && !loading ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 17, transition: 'all 0.15s', flexShrink: 0,
+              boxShadow: input.trim() && !loading ? '0 2px 8px rgba(74,144,226,.35)' : 'none',
+            }}
+            onMouseEnter={e => { if (input.trim() && !loading) e.currentTarget.style.transform = 'scale(1.1)' }}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            {loading ? '⏳' : '➤'}
+          </button>
+        </div>
       </div>
 
       <style>{`
-        @keyframes typingBounce {
+        @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: .4; }
-          50% { transform: translateY(-4px); opacity: 1; }
+          50% { transform: translateY(-5px); opacity: 1; }
         }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(8px); }
+        @keyframes msgIn {
+          from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+          /* Chat ocupa mais tela no mobile */
         }
       `}</style>
     </>
