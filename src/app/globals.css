@@ -275,28 +275,105 @@ body {
 .empty-title { font-size: 18px; font-weight: 700; }
 .empty-sub { font-size: 14px; color: var(--muted); max-width: 300px; line-height: 1.6; }
 
+/* ======================== MOBILE NAV ======================== */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #0F1117;
+  border-top: 1px solid #1F2333;
+  z-index: 100;
+  /* Altura fixa + safe area para iPhone */
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  flex-direction: row;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobile-nav::-webkit-scrollbar { display: none; }
+
+.mobile-nav-item {
+  flex: 1;
+  min-width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 2px;
+  text-decoration: none;
+  color: #6B7A99;
+  position: relative;
+  transition: color .15s;
+  white-space: nowrap;
+}
+.mobile-nav-item.active { color: #4A90E2; }
+
+.mobile-nav-indicator {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 28px; height: 3px;
+  background: #4A90E2;
+  border-radius: 0 0 4px 4px;
+}
+
+.mobile-nav-icon { font-size: 18px; line-height: 1; }
+.mobile-nav-label {
+  font-size: 9px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: .2px;
+}
+
+/* ======================== MOBILE LAYOUT ======================== */
 @media (max-width: 768px) {
+  /* Remove scroll bounce e garante altura correta */
+  html, body {
+    height: 100%;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .sidebar { display: none; }
+
+  .app { min-height: 100svh; }
+
   .main {
     margin-left: 0;
-    padding: 20px 16px 90px; /* espaço para a navbar mobile */
+    /* Padding top normal + bottom para a navbar fixa (56px) + safe area */
+    padding: 20px 16px calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
     max-width: 100vw;
+    min-height: 100svh;
   }
-  .mobile-nav {
-    display: flex !important;
-  }
-  /* Ajustes de grid para mobile */
+
+  .mobile-nav { display: flex; }
+
+  /* Grid de temas: 2 colunas */
   .themes-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
-  /* Stat cards em 2 colunas no mobile */
-  .stat-card {
-    padding: 14px 16px;
-    gap: 12px;
-  }
-  .stat-card-icon {
-    width: 40px; height: 40px; font-size: 18px;
-  }
-  .stat-card-value { font-size: 22px; }
+
+  /* Stat cards menores */
+  .stat-card { padding: 12px 14px; gap: 10px; }
+  .stat-card-icon { width: 36px; height: 36px; font-size: 16px; }
+  .stat-card-value { font-size: 20px; }
+
+  /* Page title menor */
+  .page-title { font-size: 22px; }
+
+  /* Cards com menos padding */
+  .card { padding: 16px; }
+
+  /* Alternativas mais compactas */
+  .alt { padding: 11px 14px; font-size: 13.5px; }
+
+  /* Feedback box */
+  .feedback-box { padding: 16px; }
+
+  /* Oculta sidebar no simulado */
+  .app > .main { width: 100%; }
 }

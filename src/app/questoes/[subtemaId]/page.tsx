@@ -32,6 +32,7 @@ export default function QuestoesPage() {
   const [answered, setAnswered] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sessionStats, setSessionStats] = useState({ acertos: 0, erros: 0 })
+  const [respondidas, setRespondidas] = useState<Set<number>>(new Set())
   const [favoritadas, setFavoritadas] = useState<Set<number>>(new Set())
   const [favLoading, setFavLoading] = useState(false)
   const [favMsg, setFavMsg] = useState('')
@@ -88,6 +89,7 @@ export default function QuestoesPage() {
     if (selected === null || answered) return
     setAnswered(true)
     const acertou = selected === corretaId
+    setRespondidas(prev => new Set(prev).add(questaoAtual.id))
     setSessionStats(prev => ({ acertos: prev.acertos + (acertou ? 1 : 0), erros: prev.erros + (acertou ? 0 : 1) }))
     try {
       await supabase.from('respostas').insert({
@@ -317,31 +319,35 @@ export default function QuestoesPage() {
               Navegação rápida
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {questoes.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => irParaQuestao(i)}
-                  title={`Questão ${i + 1}`}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7, border: 'none',
-                    cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                    fontFamily: 'Inter, sans-serif', transition: 'all .1s',
-                    background: i === idx
-                      ? 'var(--blue)'
-                      : i < idx
-                        ? 'var(--green)'
-                        : 'var(--border)',
-                    color: i <= idx ? '#fff' : 'var(--muted)',
-                  }}
-                >
-                  {i + 1}
-                </button>
-              ))}
+              {questoes.map((q, i) => {
+                const isAtual = i === idx
+                const isRespondida = respondidas.has(q.id)
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => irParaQuestao(i)}
+                    title={`Questão ${i + 1}`}
+                    style={{
+                      width: 28, height: 28, borderRadius: 7, border: 'none',
+                      cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                      fontFamily: 'Inter, sans-serif', transition: 'all .1s',
+                      background: isAtual
+                        ? 'var(--blue)'
+                        : isRespondida
+                          ? 'var(--green)'
+                          : 'var(--border)',
+                      color: isAtual || isRespondida ? '#fff' : 'var(--muted)',
+                    }}
+                  >
+                    {i + 1}
+                  </button>
+                )
+              })}
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, display: 'flex', gap: 14 }}>
-              <span>🔵 Atual</span>
-              <span style={{ color: 'var(--green)' }}>🟢 Visitadas</span>
-              <span>⚪ Não visitadas</span>
+              <span style={{ color: 'var(--blue)' }}>🔵 Atual</span>
+              <span style={{ color: 'var(--green)' }}>🟢 Respondidas</span>
+              <span>⚪ Não respondidas</span>
             </div>
           </div>
         )}
